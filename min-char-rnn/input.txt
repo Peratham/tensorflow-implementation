@@ -1,0 +1,1 @@
+Hello, this is a sample sentence for training RNN language model. 
