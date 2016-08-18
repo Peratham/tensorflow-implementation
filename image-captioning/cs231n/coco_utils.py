@@ -74,11 +74,11 @@ def decode_captions(captions, idx_to_word):
 
 
 def sample_coco_minibatch(data, batch_size=100, split='train'):
-  split_size = data['%s_captions' % split].shape[0]
-  mask = np.random.choice(split_size, batch_size)
-  captions = data['%s_captions' % split][mask]
-  image_idxs = data['%s_image_idxs' % split][mask]
-  image_features = data['%s_features' % split][image_idxs]
-  urls = data['%s_urls' % split][image_idxs]
-  return captions, image_features, urls
+    split_size = data['%s_captions' % split].shape[0]
+    mask = np.random.choice(split_size, batch_size)
+    captions = data['%s_captions' % split][mask]
+    image_idxs = data['%s_image_idxs' % split][mask]
+    image_features = data['%s_features' % split][image_idxs]
+    urls = data['%s_urls' % split][image_idxs]
+    return captions, image_features, urls
 
