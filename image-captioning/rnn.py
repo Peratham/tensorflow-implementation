@@ -14,7 +14,6 @@ H is dimension of hidden state.
 
 class ImageCaptioning(object):
 
-
     def __init__(self, word_to_idx, batch_size= 100, dim_feature=512, dim_embed=128, 
                     dim_hidden=128, n_time_step=None, cell_type='rnn', dtype=tf.float32):
 
