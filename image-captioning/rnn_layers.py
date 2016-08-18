@@ -17,8 +17,8 @@ def rnn_step_forward(X, prev_h, Wx, Wh, b):
     Inputs:
     - X: input data (word vector) for current time step of shape (N, M).
     - prev_h: previous hidden state of shape (N, H).
-    - Wx: weight matrix for input-to-hidden of shape (M, H).
-    - Wh: weight matrix for hidden-to-hidden of shape (H, H).
+    - Wx: matrix for input-to-hidden of shape (M, H).
+    - Wh: matrix for hidden-to-hidden of shape (H, H).
     - b: biases of shape (H,).
 
     Returns:
@@ -35,8 +35,8 @@ def rnn_forward(X, h0, Wx, Wh, b, param):
     - Wx: weight matrix for input-to-hidden of shape (M, H).
     - Wh: weight matrix for hidden-to-hidden of shape (H, H).
     - b: biases of shape (H,).
-    - rnn_param: dictionary with the following keys:
-        - n_time_step: time step size
+    - param: dictionary with the following keys:
+    	-n_time_step: time step size
 
     Returns:
     - h: hidden states for the entire timeseries of shape (N, T, H).
@@ -53,12 +53,66 @@ def rnn_forward(X, h0, Wx, Wh, b, param):
     h = tf.transpose(tf.pack(h_list), (1, 0, 2))
     return h
 
+def lstm_step_forward(X, prev_h, prev_c, Wx, Wh, b):
+    """
+    Inputs:
+    - X: input data (word vector) for current time step of shape (N, M).
+    - prev_h: previous hidden state of shape (N, H).
+    - prev_c: previous cell state of shape (N, H).
+    - Wx: matrix for input-to-hidden of shape (M, 4H).
+    - Wh: matrix for  hidden-to-hidden of shape (H, 4H).
+    - b: biases of shape (4H,).
+    - param: dictionary with the following keys:
+        -n_time_step: time step size
+
+    Returns:
+    - next_h: next hidden state of shape (N, H).
+    - next_c: next cell state of shape (N, H).
+    """
+
+    a = tf.matmul(X, Wx) + tf.matmul(prev_h, Wh) + b
+    a_i, a_f, a_o, a_g = tf.split(1, 4, a)
+    i = tf.nn.sigmoid(a_i)
+    f = tf.nn.sigmoid(a_f)
+    o = tf.nn.sigmoid(a_o)
+    g = tf.nn.tanh(a_g)
+
+    next_c = f * prev_c + i * g
+    next_h = o * tf.nn.tanh(next_c) 
+    return next_h, next_c
+
+def lstm_forward(X, h0, Wx, Wh, b, param):
+    """
+    Inputs:
+    - x: Input data of shape (N, T, D).
+    - h0: Initial hidden state of shape (N, H).
+    - Wx: Weights for input-to-hidden connections, of shape (D, 4H).
+    - Wh: Weights for hidden-to-hidden connections, of shape (H, 4H).
+    - b: Biases of shape (4H,).
+
+    Returns a tuple of:
+    - h: Hidden states for all timesteps of all sequences, of shape (N, T, H).
+    - cache: Values needed for the backward pass.
+    """
+    T = param['n_time_step']
+    prev_h = h0
+    prev_c = 0
+    h_list = []
+
+    for t in range(T):
+        next_h, next_c = lstm_step_forward(X[:, t, :], prev_h, prev_c, Wx, Wh, b)
+        h_list.append(next_h)  # tensor flow doesn't provide item assignment such as h[:,t,:] = next_h
+        prev_h = next_h
+        prev_c = next_c
+    h = tf.transpose(tf.pack(h_list), (1, 0, 2))
+    return h
+
 def temporal_affine_forward(X, W, b, param):
     """
     Inputs:
-    - X: input data of shape (N, T, H)
-    - W: weights of shape (H, V)
-    - b: biases of shape (V,)
+    - X: input data of shape (N, T, H).
+    - W: weights of shape (H, V).
+    - b: biases of shape (V,).
     - param: dictionary with the following keys:
         - batch_size: mini batch size 
         - n_time_step: time step size
@@ -66,7 +120,7 @@ def temporal_affine_forward(X, W, b, param):
         - vocab_size: vocabulary size
 
     Returns:
-    - out: Output data of shape (N, T, V)
+    - out: Output data of shape (N, T, V).
     """
     N = param['batch_size']
     T = param['n_time_step']
@@ -80,12 +134,12 @@ def temporal_affine_forward(X, W, b, param):
 def affine_forward(X, W, b):
     """
     Inputs:
-    - X: input data of shape (N, F)
-    - W: weights of shape (F, H)
-    - b: biases of shape (H,)
+    - X: input data of shape (N, F).
+    - W: weights of shape (F, H).
+    - b: biases of shape (H,).
 
     Returns:
-    - out: output data of shape (N, H)
+    - out: output data of shape (N, H).
     """
     out = tf.matmul(X, W) + b
     return out
@@ -93,8 +147,8 @@ def affine_forward(X, W, b):
 def temporal_softmax_loss(X, y, mask, param):
     """
     Inputs:
-    - X: input scores of shape (N, T, V)
-    - y: ground-truth indices of shape (N, T) where each element is in the range [0, V)
+    - X: input scores of shape (N, T, V).
+    - y: ground-truth indices of shape (N, T) where each element is in the range [0, V).
     - mask: boolean array of shape (N, T) where mask[i, t] tells whether or not
     the scores at x[i, t] should contribute to the loss.
     - param: dictionary with the following keys:
