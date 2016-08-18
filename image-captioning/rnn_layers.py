@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+
 def word_embedding_forward(captions_in, W_embed):
     """
     Inputs:
@@ -36,7 +37,7 @@ def rnn_forward(X, h0, Wx, Wh, b, param):
     - Wh: weight matrix for hidden-to-hidden of shape (H, H).
     - b: biases of shape (H,).
     - param: dictionary with the following keys:
-    	-n_time_step: time step size
+        -n_time_step: time step size
 
     Returns:
     - h: hidden states for the entire timeseries of shape (N, T, H).
