@@ -85,15 +85,14 @@ def lstm_step_forward(X, prev_h, prev_c, Wx, Wh, b):
 def lstm_forward(X, h0, Wx, Wh, b, param):
     """
     Inputs:
-    - x: Input data of shape (N, T, D).
-    - h0: Initial hidden state of shape (N, H).
-    - Wx: Weights for input-to-hidden connections, of shape (D, 4H).
-    - Wh: Weights for hidden-to-hidden connections, of shape (H, 4H).
-    - b: Biases of shape (4H,).
+    - x: input data of shape (N, T, D).
+    - h0: initial hidden state of shape (N, H).
+    - Wx: weights for input-to-hidden connections, of shape (D, 4H).
+    - Wh: weights for hidden-to-hidden connections, of shape (H, 4H).
+    - b: biases of shape (4H,).
 
     Returns a tuple of:
-    - h: Hidden states for all timesteps of all sequences, of shape (N, T, H).
-    - cache: Values needed for the backward pass.
+    - h: hidden states for all timesteps of all sequences, of shape (N, T, H).
     """
     T = param['n_time_step']
     prev_h = h0
@@ -121,7 +120,7 @@ def temporal_affine_forward(X, W, b, param):
         - vocab_size: vocabulary size
 
     Returns:
-    - out: Output data of shape (N, T, V).
+    - out: output data of shape (N, T, V).
     """
     N = param['batch_size']
     T = param['n_time_step']
@@ -135,8 +134,8 @@ def temporal_affine_forward(X, W, b, param):
 def affine_forward(X, W, b):
     """
     Inputs:
-    - X: input data of shape (N, F).
-    - W: weights of shape (F, H).
+    - X: input data of shape (N, D).
+    - W: weights of shape (D, H).
     - b: biases of shape (H,).
 
     Returns:
@@ -159,7 +158,7 @@ def temporal_softmax_loss(X, y, mask, param):
         - vocab_size: vocabulary size
 
     Returns:
-    - loss: Scalar giving loss
+    - loss: scalar giving loss
     """
     N = param['batch_size']
     T = param['n_time_step']
