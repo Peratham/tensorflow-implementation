@@ -6,7 +6,7 @@ There are some notations.
 N is batch size.
 L is spacial size of feature vector (196)
 D is dimension of image feature vector (512)
-T is the number of time step which is equal to length of each caption.
+T is the number of time step which is equal to (length of each caption) - 1.
 V is vocabulary size. 
 M is dimension of word vector which is embedding size.
 H is dimension of hidden state.
