@@ -1,9 +1,9 @@
 import tensorflow as tf
 import numpy as np
-from rnn_layers import rnn_forward, lstm_forward, lstm_step_forward_with_attention
-from rnn_layers import word_embedding_forward, affine_forward, affine_tanh_forward 
-from rnn_layers import temporal_affine_forward, temporal_softmax_loss
-
+from layers import rnn_forward, lstm_forward, lstm_step_forward_with_attention
+from layers import word_embedding_forward, affine_forward, affine_tanh_forward 
+from layers import temporal_affine_forward, temporal_softmax_loss
+from utils import init_weight, init_bias
 """
 This is a implementation for attention based image captioning model.
 There are some notations. 
@@ -47,31 +47,31 @@ class CaptionGenerator(object):
         self._end = word_to_idx.get('<END>', None)
 
         # Initialize parameters for generating initial hidden and cell states
-        self.params['W_init_h'] = tf.Variable(tf.truncated_normal([self.D, self.H], stddev=1.0/np.sqrt(self.D)), name= 'W_init_h')
-        self.params['b_init_h'] = tf.Variable(tf.zeros([self.H]), name='b_init_h')
-        self.params['W_init_c'] = tf.Variable(tf.truncated_normal([self.D, self.H], stddev=1.0/np.sqrt(self.D)), name= 'W_init_c')
-        self.params['b_init_c'] = tf.Variable(tf.zeros([self.H]), name='b_init_c')
+        self.params['W_init_h'] = init_weight('W_init_h', [self.D, self.H])
+        self.params['b_init_h'] = init_bias('b_init_h', [self.H])
+        self.params['W_init_c'] = init_weight('W_init_c', [self.D, self.H])
+        self.params['b_init_c'] = init_bias('b_init_c', [self.H])
 
         # Initialize word vectors
-        self.params['W_embed'] = tf.Variable(tf.truncated_normal([self.V, self.M], stddev=1.0/np.sqrt(self.V)), name= 'W_embed')
+        self.params['W_embed'] = init_weight('W_embed', [self.V, self.M])
 
         # Initialize parametres for attention layer 
-        self.params['W_proj_x'] = tf.Variable(tf.truncated_normal([self.D, self.D], stddev=1.0/np.sqrt(self.D)), name= 'W_proj_x')
-        self.params['W_proj_h'] = tf.Variable(tf.truncated_normal([self.H, self.D], stddev=1.0/np.sqrt(self.H)), name= 'W_proj_h')
-        self.params['b_proj'] = tf.Variable(tf.zeros([self.D]), name='b_proj')
-        self.params['W_att'] = tf.Variable(tf.truncated_normal([self.D, 1], 1.0/np.sqrt(self.D)), name= 'W_att')
+        self.params['W_proj_x'] = init_weight('W_proj_x', [self.D, self.D])
+        self.params['W_proj_h'] = init_weight('W_proj_h', [self.H, self.D])
+        self.params['b_proj'] = init_bias('b_proj', [self.D])
+        self.params['W_att'] = init_weight('W_att', [self.D, 1])
 
 
         # Initialize parameters for the RNN/LSTM
         dim_mul = {'lstm': 4, 'rnn': 1}[cell_type]
-        self.params['Wx'] = tf.Variable(tf.truncated_normal([self.M, self.H * dim_mul], stddev=1.0/np.sqrt(self.M)), name= 'Wx')
-        self.params['Wh'] = tf.Variable(tf.truncated_normal([self.H, self.H * dim_mul], stddev=1.0/np.sqrt(self.H)), name= 'Wh')
-        self.params['Wz'] = tf.Variable(tf.truncated_normal([self.D, self.H * dim_mul], stddev=1.0/np.sqrt(self.D)), name= 'Wz')
-        self.params['b'] = tf.Variable(tf.zeros([self.H * dim_mul]), name='b')
+        self.params['Wx'] = init_weight('Wx', [self.M, self.H * dim_mul])
+        self.params['Wh'] = init_weight('Wh', [self.H, self.H * dim_mul])
+        self.params['Wz'] = init_weight('Wz', [self.D, self.H * dim_mul])
+        self.params['b'] = init_bias('b', [self.H * dim_mul])
 
         # Initialize parameters for output-to-vocab
-        self.params['W_vocab'] = tf.Variable(tf.truncated_normal([self.H, self.V], stddev=1.0/np.sqrt(self.H)), name= 'W_vocab')
-        self.params['b_vocab'] = tf.Variable(tf.zeros([self.V]), name='b_vocab')
+        self.params['W_vocab'] = init_weight('W_vocab', [self.H, self.V])
+        self.params['b_vocab'] = init_bias('b_vocab', [self.V])
 
         # Cast parameters to correct dtype
         for k, v in self.params.iteritems():
