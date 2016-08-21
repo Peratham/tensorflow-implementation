@@ -7,9 +7,7 @@ class CaptioningSolver(object):
     CaptioningSolver produces functions:
         - train: trains model and prints loss and useful informations for debugging.  
         - test: generates(or samples) caption and visualizes alpha weights with image.
-
         Example usage might look something like this:
-
         data = load_coco_data()
         model = CaptionGenerator(word_to_idx, batch_size= 100, dim_feature=[196, 512], dim_embed=128,
                                    dim_hidden=128, n_time_step=16, cell_type='lstm', dtype=tf.float32)
@@ -71,8 +69,7 @@ class CaptioningSolver(object):
 
     def train(self):
         """
-        trains model and prints loss and useful informations for debugging. 
-
+        Train model and print out some useful information(loss, generated captions) for debugging.  
         """
         n_examples = self.data['train_captions'].shape[0]
         n_iters_per_epoch = n_examples // self.batch_size
@@ -81,17 +78,26 @@ class CaptioningSolver(object):
         features = self.data['train_features']
         captions = self.data['train_captions']
 
-        # build train graph
+        # build train model graph
         loss, generated_captions = self.model.build_model()
         optimizer = self.optimizer(self.learning_rate).minimize(loss)
 
+        # build test model graph
+        _, sampled_captions = self.model.build_sampler()
+        
         print "n_epochs: ", self.n_epochs
         print "n_iters_per_epoch: ", n_iters_per_epoch
         print "batch size: ", self.batch_size
         print "n_examples: ", n_examples
 
+
         with tf.Session() as sess:
             tf.initialize_all_variables().run()
+            saver = tf.train.Saver(max_to_keep=10)
+            print "variable name: %s" %self.model.params['W_init_h'].name
+
+
+            # actual training step
             for e in range(self.n_epochs):
                 for i in range(n_iters_per_epoch):
                     features_batch = features[i*self.batch_size:(i+1)*self.batch_size]
@@ -99,9 +105,20 @@ class CaptioningSolver(object):
                     feed_dict = { self.model.features: features_batch, self.model.captions: captions_batch }
                     sess.run(optimizer, feed_dict)
 
-                if e % self.print_every == 0:
-                    l, gen_caps = sess.run([loss, generated_captions], feed_dict)
-                    print "Train Loss at Epoch %d: %.5f" %(e, l)
+                    if e % self.print_every == 0:
+                        l, gen_caps = sess.run([loss, generated_captions], feed_dict)
+                        self.loss_history.append(l)
+                        print "Train Loss at Epoch %d: %.5f" %(e, l)
 
-                    decoded = decode_captions(gen_caps, self.model.idx_to_word)
-                    print "Generated Sentence: %s" %decoded[0]
+                        decoded = decode_captions(gen_caps, self.model.idx_to_word)
+                        for j in range(10):
+                            print "Generated Caption: %s" %decoded[j]
+
+            for i in range(1):
+                features_batch = features[i*self.batch_size:(i+1)*self.batch_size]
+                feed_dict = { self.model.features: features_batch}
+                sam_cap = sess.run(sampled_captions, feed_dict)
+
+                decoded = decode_captions(sam_cap, self.model.idx_to_word)
+                for j in range(10):
+                    print "Sampled Caption: %s" %decoded[j]
