@@ -18,14 +18,13 @@ def word_embedding_forward(captions_in, W_embed):
     Inputs:
     - captions_in: input caption data (word index) for entire timeseries of shape (N, T) or (N,).
     - W_embed: embedding matrix of shape (V, M).
-
     Returns:
     - out: word vector of shape (N, T, M) or (N, M).
     """
     out = tf.nn.embedding_lookup(W_embed, captions_in)
     return out
 
-def rnn_step_forward(X, prev_h, Wx, Wh, b):
+def rnn_step_forward(X, features, prev_h, params, hyper_params):
     """
     Inputs:
     - X: input data (word vector) for current time step of shape (N, M).
@@ -33,14 +32,18 @@ def rnn_step_forward(X, prev_h, Wx, Wh, b):
     - Wx: matrix for input-to-hidden of shape (M, H).
     - Wh: matrix for hidden-to-hidden of shape (H, H).
     - b: biases of shape (H,).
-
     Returns:
     - next_h: hidden states for current time step, of shape (N, H).
     """
-    next_h = tf.nn.tanh(tf.matmul(X, Wx) + tf.matmul(prev_h, Wh) + b)
-    return next_h
+    Wx = params['Wx']
+    Wh = params['Wh']
+    Wz = params['Wz']
+    b = params['b']
+    context, alpha = attention_forward(features, prev_h, params, hyper_params)
+    next_h = tf.nn.tanh(tf.matmul(X, Wx) + tf.matmul(prev_h, Wh) + b + tf.matmul(context, Wz))
+    return next_h, alpha
 
-def rnn_forward(X, h0, Wx, Wh, b, hyper_param):
+def rnn_forward(X, features, h0, params, hyper_params):
     """
     Inputs:
     - X: input data for the entire timeseries of shape (N, T, M).
@@ -48,18 +51,17 @@ def rnn_forward(X, h0, Wx, Wh, b, hyper_param):
     - Wx: weight matrix for input-to-hidden of shape (M, H).
     - Wh: weight matrix for hidden-to-hidden of shape (H, H).
     - b: biases of shape (H,).
-    - hyper_param: dictionary with the following key:
+    - hyper_params: dictionary with the following key:
         -n_time_step: time step size
-
     Returns:
     - h: hidden states for the entire timeseries of shape (N, T, H).
     """
-    T = hyper_param['n_time_step']
+    T = hyper_params['n_time_step']
     prev_h = h0
     h_list = []
 
     for t in range(T):
-        next_h = rnn_step_forward(X[:,t,:], prev_h, Wx, Wh, b)
+        next_h, _ = rnn_step_forward(X[:,t,:], features, prev_h, params, hyper_params)
         h_list.append(next_h)  # tensor flow doesn't provide item assignment such as h[:,t,:] = next_h
         prev_h = next_h
 
@@ -81,7 +83,6 @@ def attention_forward(X, prev_h, params, hyper_params):
         - batch_size: mini batch size
         - spacial_size: spacial size of feature vector
         - dim_feature: dimension of feature vector
-
     Returns:
     - context: output data (context vector) for soft attention of shape (N, D) 
     - alpha: alpha weights for visualization of shape (N, L)
@@ -125,7 +126,6 @@ def lstm_step_forward_with_attention(X, features, prev_h, prev_c, params, hyper_
         - batch_size: mini batch size
         - spacial_size: spacial size of feature vector
         - dim_feature: dimension of feature vector
-
     Returns:
     - next_h: next hidden state of shape (N, H).
     - next_c: next cell state of shape (N, H).
@@ -158,7 +158,6 @@ def lstm_forward(X, features, h0, c0, params, hyper_params):
     - params: dictionary used in lstm_step_forward_with_attention.
     - hyper_params: dictionary with the following keys:
         - n_time_step: time step size
-
     Returns a tuple of:
     - h: Hidden states for all timesteps of all sequences, of shape (N, T, H).
     """
@@ -181,7 +180,6 @@ def affine_forward(X, W, b):
     - X: input data of shape (N, H).
     - W: weights of shape (H, V).
     - b: biases of shape (V,).
-
     Returns:
     - out: output data of shape (N, V).
     """
@@ -194,7 +192,6 @@ def affine_tanh_forward(X, W, b):
     - X: input data of shape (N, D).
     - W: weights of shape (D, H).
     - b: biases of shape (H,).
-
     Returns:
     - out: output data of shape (N, H).
     """
@@ -213,7 +210,6 @@ def temporal_affine_forward(X, W, b, hyper_params):
         - n_time_step: time step size
         - dim_hidden: dimension of hidden state
         - vocab_size: vocabulary size
-
     Returns:
     - out: Output data of shape (N, T, V).
     """
@@ -238,7 +234,6 @@ def temporal_softmax_loss(X, y, mask, hyper_params):
         - n_time_step: time step size
         - dim_hidden: dimension of hidden state
         - vocab_size: vocabulary size
-
     Returns:
     - loss: Scalar giving loss
     """
