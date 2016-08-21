@@ -88,7 +88,6 @@ class CaptionGenerator(object):
         - features: input image features of shape (N, L, D)
         - captions: ground-truth captions; an integer array of shape (N, T+1) where
           each element is in the range [0, V)
-
         Returns
         - logits: score of shape (N, T, V)
         - loss: scalar loss
@@ -143,7 +142,7 @@ class CaptionGenerator(object):
 
         # lstm forward
         if self.cell_type == 'rnn':
-            h = rnn_forward(x, h0, Wx, Wh, b, hyper_params)
+            h = rnn_forward(x, features, h0, self.params, hyper_params)
         else: 
             h = lstm_forward(x, features, h0, c0, self.params, hyper_params)   # (N, T, H)
 
@@ -163,7 +162,6 @@ class CaptionGenerator(object):
         """
         Input:
         - max_len: max length of generating cations
-
         Place Holder:
         - features: input image features of shape (N, L, D)
         
@@ -223,10 +221,12 @@ class CaptionGenerator(object):
 
             # lstm forward
             if self.cell_type == 'rnn':
-                h = rnn_forward(x, h0, Wx, Wh, b, hyper_params)
+                h, alpha = rnn_forward(x, h0, Wx, Wh, b, hyper_params)
             else: 
                 h, c, alpha = lstm_step_forward_with_attention(x, features, prev_h, prev_c, self.params, hyper_params) # (N, H), (N, H), (N, L)
-
+            
+            prev_h = h
+            prev_c = c
             # save alpha weights
             alpha_list.append(alpha)
 
