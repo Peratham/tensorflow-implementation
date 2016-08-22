@@ -24,14 +24,17 @@ def word_embedding_forward(captions_in, W_embed):
     out = tf.nn.embedding_lookup(W_embed, captions_in)
     return out
 
-def rnn_step_forward(X, features, prev_h, params, hyper_params):
+def rnn_step_forward_with_attention(X, features, prev_h, params, hyper_params):
     """
     Inputs:
     - X: input data (word vector) for current time step of shape (N, M).
+    - features: input data (feature vectors) of shape (N, L, D)
     - prev_h: previous hidden state of shape (N, H).
-    - Wx: matrix for input-to-hidden of shape (M, H).
-    - Wh: matrix for hidden-to-hidden of shape (H, H).
-    - b: biases of shape (H,).
+    - params: dictionary with the following keys:
+        - Wx: matrix for input-to-hidden of shape (M, H).
+        - Wh: matrix for  hidden-to-hidden of shape (H, H).
+        - Wz: matrix for context-to-hidden of shape(D, 4).
+        - b: biases of shape (H,).
     Returns:
     - next_h: hidden states for current time step, of shape (N, H).
     """
@@ -40,7 +43,7 @@ def rnn_step_forward(X, features, prev_h, params, hyper_params):
     Wz = params['Wz']
     b = params['b']
     context, alpha = attention_forward(features, prev_h, params, hyper_params)
-    next_h = tf.nn.tanh(tf.matmul(X, Wx) + tf.matmul(prev_h, Wh) + b + tf.matmul(context, Wz))
+    next_h = tf.nn.tanh(tf.matmul(X, Wx) + tf.matmul(prev_h, Wh) + tf.matmul(context, Wz)) + b
     return next_h, alpha
 
 def rnn_forward(X, features, h0, params, hyper_params):
@@ -48,9 +51,8 @@ def rnn_forward(X, features, h0, params, hyper_params):
     Inputs:
     - X: input data for the entire timeseries of shape (N, T, M).
     - h0: initial hidden state of shape (N, H).
-    - Wx: weight matrix for input-to-hidden of shape (M, H).
-    - Wh: weight matrix for hidden-to-hidden of shape (H, H).
-    - b: biases of shape (H,).
+    - features: input data (feature vectors) of shape (N, L, D)
+    - params: dictionary used in rnn_step_forward_with_attention.
     - hyper_params: dictionary with the following key:
         -n_time_step: time step size
     Returns:
@@ -61,7 +63,7 @@ def rnn_forward(X, features, h0, params, hyper_params):
     h_list = []
 
     for t in range(T):
-        next_h, _ = rnn_step_forward(X[:,t,:], features, prev_h, params, hyper_params)
+        next_h, _ = rnn_step_forward_with_attention(X[:,t,:], features, prev_h, params, hyper_params)
         h_list.append(next_h)  # tensor flow doesn't provide item assignment such as h[:,t,:] = next_h
         prev_h = next_h
 
@@ -74,7 +76,7 @@ def attention_forward(X, prev_h, params, hyper_params):
     Inputs: 
     - X: input data (feature vectors) of shape (N, L, D)
     - prev_h: previous hidden state of shape (N, H)
-    - param: dictionary with the following keys:
+    - params: dictionary with the following keys:
         - W_proj_x: matrix for projecting(or encoding) feature vector of shape (D, D)
         - W_proj_h: matrix for projecting(or encoding) previous hidden state of shape (H, D)
         - b_proj: biases of shape (D,)
@@ -101,7 +103,7 @@ def attention_forward(X, prev_h, params, hyper_params):
     X_proj = tf.reshape(X_proj, [N,L,D])  # (N, L, D)
     h_proj = tf.matmul(prev_h, W_proj_h)  # (N, D)
     h_proj = tf.expand_dims(h_proj, 1)   # (N, 1, D)
-    hidden = tf.nn.relu(X_proj + h_proj + b_proj)  # (N, L, D)
+    hidden = tf.nn.tanh(X_proj + h_proj + b_proj)  # (N, L, D)
     hidden_flat = tf.reshape(hidden, [N*L,D])
     out =  tf.matmul(hidden_flat, W_att) # (N x L, 1)   In this case, we don't need to add bias because of softmax.
     out =  tf.reshape(out, [N,L])
@@ -138,7 +140,7 @@ def lstm_step_forward_with_attention(X, features, prev_h, prev_c, params, hyper_
 
     context, alpha = attention_forward(features, prev_h, params, hyper_params)
 
-    a = tf.matmul(X, Wx) + tf.matmul(prev_h, Wh) + b  + tf.matmul(context, Wz)  
+    a = tf.matmul(X, Wx) + tf.matmul(prev_h, Wh) + tf.matmul(context, Wz) + b    
     a_i, a_f, a_o, a_g = tf.split(1, 4, a)
     i = tf.nn.sigmoid(a_i)
     f = tf.nn.sigmoid(a_f)
