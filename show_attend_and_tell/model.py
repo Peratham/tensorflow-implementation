@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from layers import rnn_forward, lstm_forward, lstm_step_forward_with_attention
+from layers import rnn_forward, rnn_step_forward_with_attention, lstm_forward, lstm_step_forward_with_attention
 from layers import word_embedding_forward, affine_forward, affine_tanh_forward 
 from layers import temporal_affine_forward, temporal_softmax_loss
 from utils import init_weight, init_bias
@@ -96,58 +96,35 @@ class CaptionGenerator(object):
         features = self.features
         captions = self.captions
 
-        # some hyper-parameters
-        T = self.T
-        N = self.N
-        V = self.V
-        H = self.H
-        M = self.M
-        L = self.L
-        D = self.D
+        # parameters
+        params = self.params
 
-        # hyper_params used in some function calls
-        hyper_params = {'batch_size': N, 'spacial_size': L, 'dim_feature': D,
-                            'n_time_step': T, 'dim_hidden': H, 'vocab_size': V}
+        # hyper parameters
+        hyper_params = {'batch_size': self.N, 'spacial_size': self.L, 'dim_feature': self.D,
+                            'n_time_step': self.T, 'dim_hidden': self.H, 'vocab_size': self.V}
 
         # captions for input/output and mask matrix
-        captions_in = captions[:, :T]      # same as captions[:, :-1], tensorflow doesn't provide negative stop slice yet.
+        captions_in = captions[:, :self.T]      # same as captions[:, :-1], tensorflow doesn't provide negative stop slice yet.
         captions_out = captions[:, 1:]  
         mask = tf.not_equal(captions_out, self._null)
         
-        # word embedding matrix
-        W_embed = self.params['W_embed'] 
-
-        # parameters for generating initial hidden/cell state
-        W_init_h = self.params['W_init_h'] 
-        b_init_h = self.params['b_init_h'] 
-        W_init_c = self.params['W_init_c'] 
-        b_init_c = self.params['b_init_c'] 
-
-        # parameters for input-to-hidden, hidden-to-hidden
-        Wx = self.params['Wx'] 
-        Wh = self.params['Wh']
-        b = self.params['b'] 
-
-        # parameters for hidden-to-vocab 
-        W_vocab = self.params['W_vocab'] 
-        b_vocab = self.params['b_vocab'] 
-
+        
         # generate initial hidden state using cnn features 
         mean_features = tf.reduce_mean(features, 1)
-        h0 = affine_tanh_forward(mean_features, W_init_h, b_init_h)  # (N, H)
-        c0 = affine_tanh_forward(mean_features, W_init_c, b_init_c)  # (N, h)
+        h0 = affine_tanh_forward(mean_features, params['W_init_h'], params['b_init_h'])  # (N, H)
+        c0 = affine_tanh_forward(mean_features, params['W_init_c'], params['b_init_c'])  # (N, h)
 
         # generate input x (word vector)
-        x = word_embedding_forward(captions_in, W_embed)  # (N, T, M)
+        x = word_embedding_forward(captions_in, params['W_embed'])  # (N, T, M)
 
         # lstm forward
         if self.cell_type == 'rnn':
-            h = rnn_forward(x, features, h0, self.params, hyper_params)
+            h = rnn_forward(x, features, h0, params, hyper_params)
         else: 
-            h = lstm_forward(x, features, h0, c0, self.params, hyper_params)   # (N, T, H)
+            h = lstm_forward(x, features, h0, c0, params, hyper_params)   # (N, T, H)
 
         # hidden-to-vocab
-        logits = temporal_affine_forward(h, W_vocab, b_vocab, hyper_params)  # (N, T, V)
+        logits = temporal_affine_forward(h, params['W_vocab'], params['b_vocab'], hyper_params)  # (N, T, V)
     
         # softmax loss
         loss = temporal_softmax_loss(logits, captions_out, mask, hyper_params)
@@ -161,7 +138,7 @@ class CaptionGenerator(object):
     def build_sampler(self, max_len=20):
         """
         Input:
-        - max_len: max length of generating cations
+        - max_len: max length for generating cations
         Place Holder:
         - features: input image features of shape (N, L, D)
         
@@ -173,41 +150,17 @@ class CaptionGenerator(object):
         # place holder
         features = self.features
 
-        # some hyper-parameters
-        T = self.T
-        N = self.N
-        V = self.V
-        H = self.H
-        M = self.M
-        L = self.L
-        D = self.D
+        #parameters
+        params = self.params
 
-        # hyper_params used in some function calls
-        hyper_params = {'batch_size': N, 'spacial_size': L, 'dim_feature': D,
-                            'n_time_step': T, 'dim_hidden': H, 'vocab_size': V}
-
-        # word embedding matrix
-        W_embed = self.params['W_embed'] 
-
-        # parameters for generating initial hidden/cell state
-        W_init_h = self.params['W_init_h'] 
-        b_init_h = self.params['b_init_h'] 
-        W_init_c = self.params['W_init_c'] 
-        b_init_c = self.params['b_init_c'] 
-
-        # parameters for input-to-hidden, hidden-to-hidden
-        Wx = self.params['Wx'] 
-        Wh = self.params['Wh']
-        b = self.params['b'] 
-
-        # parameters for hidden-to-vocab 
-        W_vocab = self.params['W_vocab'] 
-        b_vocab = self.params['b_vocab'] 
+        # hyper parameters 
+        hyper_params = {'batch_size': self.N, 'spacial_size': self.L, 'dim_feature': self.D,
+                            'n_time_step': self.T, 'dim_hidden': self.H, 'vocab_size': self.V}
 
         # generate initial hidden state using cnn features 
         mean_features = tf.reduce_mean(features, 1)
-        prev_h = affine_tanh_forward(mean_features, W_init_h, b_init_h)  # (N, H)
-        prev_c = affine_tanh_forward(mean_features, W_init_c, b_init_c)  # (N, h)
+        prev_h = affine_tanh_forward(mean_features, params['W_init_h'], params['b_init_h'])  # (N, H)
+        prev_c = affine_tanh_forward(mean_features, params['W_init_c'], params['b_init_c'])  # (N, h)
 
         sampled_word_list = []
         alpha_list = []
@@ -215,27 +168,31 @@ class CaptionGenerator(object):
         for t in range(max_len):
             # embed the previous generated word
             if t == 0:
-                x = tf.zeros([N, M])            # what about assign word vector for '<START>' token ?
+                x = tf.zeros([self.N, self.M])            # what about assign word vector for '<START>' token ?
             else:
-                x = word_embedding_forward(sampled_word, W_embed)    # (N, M)
+                x = word_embedding_forward(sampled_word, params['W_embed'])    # (N, M)
 
             # lstm forward
             if self.cell_type == 'rnn':
-                h, alpha = rnn_forward(x, h0, Wx, Wh, b, hyper_params)
+                h, alpha = rnn_step_forward_with_attention(x, features, prev_h, params, hyper_params)    #  (N, H), (N, L)
             else: 
-                h, c, alpha = lstm_step_forward_with_attention(x, features, prev_h, prev_c, self.params, hyper_params) # (N, H), (N, H), (N, L)
-            
+                h, c, alpha = lstm_step_forward_with_attention(x, features, prev_h, prev_c, params, hyper_params)    # (N, H), (N, H), (N, L)
+                prev_c = c
+                
+            # prepare for next time step
             prev_h = h
-            prev_c = c
+            
             # save alpha weights
             alpha_list.append(alpha)
 
-            # generate scores from current hidden state and sample word indices
-            logits = affine_forward(h, W_vocab, b_vocab)     # (N, V)
-            sampled_word = tf.argmax(logits, 1)      # (N, ) where value is in the range of [0, V) 
-            sampled_word_list.append(sampled_word)  # tensor flow doesn't provide item assignment 
+            # generate scores(logits) from current hidden state
+            logits = affine_forward(h, params['W_vocab'], params['b_vocab'])       # (N, V)
 
-        alphas = tf.transpose(tf.pack(alpha_list), (1, 0, 2)) #  (N, T, L)
-        sampled_words = tf.transpose(tf.pack(sampled_word_list), (1,0)) # (N, max_len)
+            # sample word indices with logits
+            sampled_word = tf.argmax(logits, 1)        # (N, ) where value is in the range of [0, V) 
+            sampled_word_list.append(sampled_word)        # tensor flow doesn't provide item assignment 
 
-        return alphas, sampled_words
+        alphas = tf.transpose(tf.pack(alpha_list), (1, 0, 2))     #  (N, T, L)
+        sampled_captions = tf.transpose(tf.pack(sampled_word_list), (1,0))     # (N, max_len)
+
+        return alphas, sampled_captions
