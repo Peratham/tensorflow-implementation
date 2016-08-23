@@ -1,9 +1,10 @@
-from coco_utils import decode_captions
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import skimage.transform
 import numpy as np
 from scipy import ndimage
+from coco_utils import decode_captions, sample_coco_minibatch
+
 
 class CaptioningSolver(object):
     """
@@ -50,13 +51,15 @@ class CaptioningSolver(object):
         self.learning_rate = kwargs.pop('learning_rate', 0.03)
         self.print_every = kwargs.pop('print_every', 10)
         self.save_every = kwargs.pop('save_every', 100)
+        self.model_path = kwargs.pop('model_path', './model/')
+        self.test_model = kwargs.pop('test_model', './model/model-200')
 
         # Book-keeping variables 
-        self.best_val_acc = 0
-        self.best_params = {}
+        #self.best_val_acc = 0
+        #self.best_params = {}
         self.loss_history = []
-        self.train_acc_history = []
-        self.val_acc_history = []
+        #self.train_acc_history = []
+        #self.val_acc_history = []
 
         # Set optimizer by update rule
         if self.update_rule == 'adam':
@@ -88,64 +91,90 @@ class CaptioningSolver(object):
         # build test model graph
         alphas, sampled_captions = self.model.build_sampler()    # (N, max_len, L), (N, max_len)
         
-        print "n_epochs: ", self.n_epochs
-        print "n_iters_per_epoch: ", n_iters_per_epoch
-        print "batch size: ", self.batch_size
-        print "n_examples: ", n_examples
+        print "num epochs: %d" %self.n_epochs
+        print "iterations per epoch: %d" %n_iters_per_epoch
+        print "data size: %d" %n_examples
+        print "batch size: %d" %self.batch_size
 
-
-        with tf.Session() as sess:
-            tf.initialize_all_variables().run()
-            saver = tf.train.Saver(max_to_keep=10)
+        sess = tf.InteractiveSession()
+        tf.initialize_all_variables().run()
+        saver = tf.train.Saver(max_to_keep=10)
+        
+        for e in range(self.n_epochs):
+            # print initial loss
+            if e == 0:
+                captions_batch, features_batch, _ = sample_coco_minibatch(self.data, self.batch_size, split='train')
+                feed_dict = { self.model.features: features_batch, self.model.captions: captions_batch }
+                gen_caps, l = sess.run([generated_captions, loss], feed_dict)
+                self.loss_history.append(l)
+                print ""
+                print "*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*"
+                print "Initial Train Loss: %.5f" %l
+                decoded = decode_captions(gen_caps, self.model.idx_to_word)
+                for j in range(3):
+                    print "Generated Caption: %s" %decoded[j]
+                print "*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*"
+                print ""
 
             # actual training step
-            for e in range(self.n_epochs):
-                for i in range(n_iters_per_epoch):
-                    features_batch = features[i*self.batch_size:(i+1)*self.batch_size]
-                    captions_batch = captions[i*self.batch_size:(i+1)*self.batch_size]
-                    feed_dict = { self.model.features: features_batch, self.model.captions: captions_batch }
-                    _, l = sess.run([optimizer, loss], feed_dict)
-                    self.loss_history.append(l)
-                    
-                    if e % self.print_every == 0:
-                        gen_caps = sess.run(generated_captions, feed_dict)
-                        
-                        print "Train Loss at Epoch %d: %.5f" %(e, l)
+            for i in range(n_iters_per_epoch):
+                captions_batch, features_batch, _ = sample_coco_minibatch(self.data, self.batch_size, split='train')
+                feed_dict = { self.model.features: features_batch, self.model.captions: captions_batch }
+                sess.run(optimizer, feed_dict)
 
-                        decoded = decode_captions(gen_caps, self.model.idx_to_word)
-                        for j in range(10):
-                            print "Generated Caption: %s" %decoded[j]
+            # save loss history
+            l = sess.run(loss, feed_dict)
+            self.loss_history.append(l)
 
-            # actual test step: sample captions and visualize attention
-            features_batch = features[:self.batch_size]
-            feed_dict = { self.model.features: features_batch}
-            alps, sam_cap = sess.run([alphas, sampled_captions], feed_dict)  # (N, max_len, L), (N, max_len)
+            # print info
+            if (e+1) % self.print_every == 0:
+                gen_caps = sess.run(generated_captions, feed_dict)
+                print ""
+                print "*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*"
+                print "Train Loss at Epoch %d: %.5f" %(e+1, l)
+                decoded = decode_captions(gen_caps, self.model.idx_to_word)
+                for j in range(3):
+                    print "Generated Caption: %s" %decoded[j]
+                print "*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*"
+                print ""
 
-            # decode captions
-            decoded = decode_captions(sam_cap, self.model.idx_to_word)
+            # save model
+            if (e+1) % self.save_every == 0:
+                saver.save(sess, self.model_path+'model', global_step=e+1)
+                print "model-%s saved." %(e+1)
 
-            # visualize 10 images and captions 
-            for n in range(10):
-                print "Sampled Caption: %s" %decoded[n]
 
-                # plot original image
-                img_idx = self.data['image_idxs'][n]
-                img_path = './train2014_resized/'+ self.data['image_file_name'][img_idx]
-                img = ndimage.imread(img_path)
-                plt.subplot(4, 5, 1)
+        # actual test step: sample captions and visualize attention
+        _, features_batch, image_files = sample_coco_minibatch(self.data, self.batch_size, split='train')
+        feed_dict = { self.model.features: features_batch}
+        alps, sam_cap = sess.run([alphas, sampled_captions], feed_dict)  # (N, max_len, L), (N, max_len)
+
+        # decode captions
+        decoded = decode_captions(sam_cap, self.model.idx_to_word)
+
+        # visualize 10 images and captions 
+        for n in range(10):
+            print "Sampled Caption: %s" %decoded[n]
+
+            # plot original image
+            img_path = './train2014_resized/'+ image_files[n]
+            img = ndimage.imread(img_path)
+            plt.subplot(4, 5, 1)
+            plt.imshow(img)
+            plt.axis('off')
+
+            # plot image with attention weights
+            words = decoded[n].split(" ")
+            for t in range(len(words)):
+                if t>18:
+                    break
+                plt.subplot(4, 5, t+2)
+                plt.text(0, 1, words[t], color='black', backgroundcolor='white', fontsize=12)
                 plt.imshow(img)
-                
-                # plot image with attention weights
-                words = decoded[n].split(" ")
-                for t in range(len(words)):
-                    if t>18:
-                        break
-                    plt.subplot(4, 5, t+2)
-                    plt.text(0, 1, words[t], color='black', backgroundcolor='white', fontsize=12)
-                    plt.imshow(img)
-                    alp_curr = alps[n,t,:].reshape(14,14)
-                    alp_img = skimage.transform.pyramid_expand(alp_curr, upscale=16, sigma=20)
-                    plt.imshow(alp_img, alpha=0.8)
-                plt.show()
+                alp_curr = alps[n,t,:].reshape(14,14)
+                alp_img = skimage.transform.pyramid_expand(alp_curr, upscale=16, sigma=20)
+                plt.imshow(alp_img, alpha=0.8)
+                plt.axis('off')
+            plt.show()
 
-                    
+    
