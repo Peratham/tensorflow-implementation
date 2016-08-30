@@ -4,3 +4,8 @@
 *.pyc
 *.pickle
 *.npy
+*.hkl
+*.pkl
+train2014_resized/*
+model/*
+
