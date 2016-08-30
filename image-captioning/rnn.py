@@ -1,5 +1,5 @@
 import tensorflow as tf
-from rnn_layers import word_embedding_forward, rnn_forward, lstm_forward, affine_forward
+from rnn_layers import word_embedding_forward, rnn_forward, lstm_forward, affine_forward, affine_tanh_forward
 from rnn_layers import temporal_affine_forward, temporal_softmax_loss, rnn_step_forward, lstm_step_forward
 
 """
@@ -140,8 +140,7 @@ class ImageCaptioning(object):
         - features: input image features of shape (N, D)
 
         Returns
-        - logits: score of shape (N, T, V)
-        - loss: scalar loss
+        - sampled_idxs: generated word idxs of shape (N, T)
         """
         # some hyper-parameters
         T = self.T
