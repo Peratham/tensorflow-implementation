@@ -144,6 +144,21 @@ def affine_forward(X, W, b):
     out = tf.matmul(X, W) + b
     return out
 
+def affine_tanh_forward(X, W, b):
+    """
+    Inputs:
+    - X: input data of shape (N, D).
+    - W: weights of shape (D, H).
+    - b: biases of shape (H,).
+
+    Returns:
+    - out: output data of shape (N, H).
+    """
+    out = tf.matmul(X, W) + b
+    out = tf.nn.tanh(out)
+    print "hi"
+    return out
+
 def temporal_softmax_loss(X, y, mask, param):
     """
     Inputs:
