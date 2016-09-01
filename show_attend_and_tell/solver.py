@@ -2,6 +2,7 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import skimage.transform
 import numpy as np
+import os 
 from scipy import ndimage
 from coco_utils import decode_captions, sample_coco_minibatch
 
@@ -42,6 +43,9 @@ class CaptioningSolver(object):
         - learning_rate: learning rate; default value is 0.03.
         - print_every: Integer; training losses will be printed every print_every iterations.
         - save_every: Integer; model variables will be saved every save_every iterations.
+        - model_path: String; path for saving model
+        - test_model: String; model path for testing 
+        - image_path: String; path for images (for alpha visualization)
         """
         self.model = model
         self.data = data
@@ -53,6 +57,7 @@ class CaptioningSolver(object):
         self.save_every = kwargs.pop('save_every', 100)
         self.model_path = kwargs.pop('model_path', './model/')
         self.test_model = kwargs.pop('test_model', './model/model-200')
+        self.image_path = kwargs.pop('image_path', './data/train2014_resized/')
 
         # Book-keeping variables 
         #self.best_val_acc = 0
@@ -140,7 +145,7 @@ class CaptioningSolver(object):
 
             # save model
             if (e+1) % self.save_every == 0:
-                saver.save(sess, self.model_path+'model', global_step=e+1)
+                saver.save(sess, os.path.join(self.model_path, 'model'), global_step=e+1)
                 print "model-%s saved." %(e+1)
 
 
@@ -157,7 +162,7 @@ class CaptioningSolver(object):
             print "Sampled Caption: %s" %decoded[n]
 
             # plot original image
-            img_path = './train2014_resized/'+ image_files[n]
+            img_path = os.path.join(self.image_path, image_files[n])
             img = ndimage.imread(img_path)
             plt.subplot(4, 5, 1)
             plt.imshow(img)
