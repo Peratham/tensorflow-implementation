@@ -1,2 +1,2 @@
 # tensorflow-implementation
-tensorflow code for deep learning study
+tensorflow code for studying deep learning 
